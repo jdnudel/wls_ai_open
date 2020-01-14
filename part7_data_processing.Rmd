@@ -1,0 +1,505 @@
+
+```{r}
+#import libraries
+library("pROC", lib.loc="/Library/Frameworks/R.framework/Versions/3.5/Resources/library")
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+overnight_run = FALSE
+```
+
+
+```{r}
+# import data
+leak_test = read.csv("results/study_models_LEAK/LEAK_test_FINAL.csv", header = TRUE)
+clot_test = read.csv("results/study_models_CLOT/CLOT_test_FINAL.csv", header = TRUE)
+bariclot_test = read.csv("results/bariclot/bariclot_test.csv", header = TRUE)
+```
+
+```{r}
+# new LR models added for revisions:
+lr_leak_test = read.csv("results/study_models_LEAK/LEAK_logistic_preds_test", header = TRUE)
+lr_clot_test = read.csv("results/study_models_CLOT/CLOT_logistic_preds_test", header = TRUE)
+```
+
+```{r}
+# merge revised LR model predictions together with predictions from other models
+leak_test['lr_revised'] <- lr_leak_test$lr_leak_test
+clot_test['lr_revised'] <- lr_clot_test$lr_clot_test
+```
+
+
+```{r}
+# for easy plotting of bariclot ROC with other ROCs, do this:
+clot_test['bariclot'] <- bariclot_test$scores
+```
+
+```{r}
+# make receiver-operating curve objects
+rocobj_leak_xgb <- roc(leak_test$targs, leak_test$xgb)
+rocobj_leak_ann <- roc(leak_test$targs, leak_test$ann)
+rocobj_leak_lr  <- roc(leak_test$targs, leak_test$lr_revised)
+rocobj_clot_lr  <- roc(clot_test$targs, clot_test$lr_revised)
+rocobj_clot_xgb <- roc(clot_test$targs, clot_test$xgb)
+rocobj_clot_ann <- roc(clot_test$targs, clot_test$ann)
+rocobj_clot_bariclot <- roc(bariclot_test$targs, bariclot_test$scores)
+```
+
+```{r}
+# to see pre-revision LR model results, can run something like this, and then propogate the results below:
+#rocobj_leak_lr  <- roc(leak_test$targs, leak_test$lr_onehot)
+#rocobj_clot_lr  <- roc(clot_test$targs, clot_test$lr_onehot)
+```
+
+```{r}
+# get confidence intervals
+rocobj_leak_lr_ci_auc <- ci.auc(rocobj_leak_lr, conf.level=0.95)
+rocobj_leak_xgb_ci_auc <- ci.auc(rocobj_leak_xgb, conf.level=0.95)
+rocobj_leak_ann_ci_auc <- ci.auc(rocobj_leak_ann, conf.level=0.95)
+rocobj_clot_ann_ci_auc <- ci.auc(rocobj_clot_ann, conf.level=0.95)
+rocobj_clot_xgb_ci_auc <- ci.auc(rocobj_clot_xgb, conf.level=0.95)
+rocobj_clot_lr_ci_auc <- ci.auc(rocobj_clot_lr, conf.level=0.95)
+rocobj_clot_bariclot_ci_auc <- ci.auc(rocobj_clot_bariclot, conf.level=0.95)
+```
+
+```{r}
+## format data for table
+auc_cis_leak_lr       = c(Outcome = 'Leak', Model='LR', AUC=rocobj_leak_lr_ci_auc[2], Lower = rocobj_leak_lr_ci_auc[1], Upper = rocobj_leak_lr_ci_auc[3])
+auc_cis_leak_xgb      = c(Outcome = 'Leak', Model='XGB', AUC=rocobj_leak_xgb_ci_auc[2], Lower = rocobj_leak_xgb_ci_auc[1], Upper = rocobj_leak_xgb_ci_auc[3])
+auc_cis_leak_ann      = c(Outcome = 'Leak', Model='ANN', AUC=rocobj_leak_ann_ci_auc[2], Lower = rocobj_leak_ann_ci_auc[1], Upper = rocobj_leak_ann_ci_auc[3])
+auc_cis_clot_lr       = c(Outcome = 'Clot', Model='LR', AUC=rocobj_clot_lr_ci_auc[2], Lower = rocobj_clot_lr_ci_auc[1], Upper = rocobj_clot_lr_ci_auc[3])
+auc_cis_clot_xgb      = c(Outcome = 'Clot', Model='XGB', AUC=rocobj_clot_xgb_ci_auc[2], Lower = rocobj_clot_xgb_ci_auc[1], Upper = rocobj_clot_xgb_ci_auc[3])
+auc_cis_clot_ann      = c(Outcome = 'Clot', Model='ANN', AUC=rocobj_clot_ann_ci_auc[2], Lower = rocobj_clot_ann_ci_auc[1], Upper = rocobj_clot_ann_ci_auc[3])
+auc_cis_clot_bariclot = c(Outcome = 'Clot', Model='BariClot', AUC=rocobj_clot_bariclot_ci_auc[2], Lower = rocobj_clot_bariclot_ci_auc[1], Upper = rocobj_clot_bariclot_ci_auc[3])
+```
+
+```{r}
+## collect the data
+auc_cis = list(
+  auc_cis_leak_lr,
+  auc_cis_leak_xgb,
+  auc_cis_leak_ann,
+  auc_cis_clot_lr,
+  auc_cis_clot_xgb,
+  auc_cis_clot_ann,
+  auc_cis_clot_bariclot
+)
+
+## make the table
+auc_cis_table = bind_rows(!!!auc_cis)
+```
+
+```{r}
+## get the table into the right format and round the numbers off
+auc_cis_table$AUC <- as.numeric(as.character(auc_cis_table$AUC))
+auc_cis_table$Lower <- as.numeric(as.character(auc_cis_table$Lower))
+auc_cis_table$Upper <- as.numeric(as.character(auc_cis_table$Upper))
+auc_cis_table%>% mutate_if(is.numeric, round, 2) 
+```
+
+```{r}
+#compare leak rocs
+leak_xgb_lr  = roc.test(rocobj_leak_xgb, rocobj_leak_lr)
+leak_ann_lr  = roc.test(rocobj_leak_ann, rocobj_leak_lr)
+leak_ann_xgb = roc.test(rocobj_leak_ann, rocobj_leak_xgb)
+
+compare_leak_xgb_lr = c(Outcome = 'Leak', M1='XGB', M2='LR', P=leak_xgb_lr$p.value)
+compare_leak_ann_lr = c(Outcome = 'Leak', M1='ANN', M2='LR', P=leak_ann_lr$p.value)
+compare_leak_ann_xgb = c(Outcome = 'Leak', M1='ANN', M2='XGB', P=leak_ann_xgb$p.value)
+```
+
+```{r}
+#compare clot rocs
+clot_xgb_lr  = roc.test(rocobj_clot_xgb, rocobj_clot_lr)
+clot_ann_lr  = roc.test(rocobj_clot_ann, rocobj_clot_lr)
+clot_ann_xgb = roc.test(rocobj_clot_ann, rocobj_clot_xgb)
+
+compare_clot_xgb_lr  = c(Outcome = 'Clot', M1 = 'XGB', M2 = 'LR', P = clot_xgb_lr$p.value)
+compare_clot_ann_lr  = c(Outcome = 'Clot', M1 = 'ANN', M2 = 'LR', P = clot_ann_lr$p.value)
+compare_clot_ann_xgb = c(Outcome = 'Clot', M1 = 'ANN', M2 = 'XGB',P =  clot_ann_xgb$p.value)
+```
+
+```{r}
+#compare clot models to bariclot
+clot_ann_bariclot = roc.test(rocobj_clot_ann, rocobj_clot_bariclot)
+clot_xgb_bariclot =  roc.test(rocobj_clot_xgb, rocobj_clot_bariclot)
+clot_lr_bariclot = roc.test(rocobj_clot_lr, rocobj_clot_bariclot)
+
+compare_clot_ann_bariclot= c(Outcome = 'Clot', M1 = 'ANN', M2 = 'BariClot', P = clot_ann_bariclot$p.value)
+compare_clot_xgb_bariclot= c(Outcome = 'Clot', M1 = 'XGB', M2 = 'BariClot', P = clot_xgb_bariclot$p.value)
+compare_clot_lr_bariclot = c(Outcome = 'Clot', M1 = 'LR',  M2 = 'BariClot', P =  clot_lr_bariclot$p.value)
+```
+
+```{r}
+## collect p values
+comparisons = list(
+  compare_leak_xgb_lr ,
+  compare_leak_ann_lr ,
+  compare_leak_ann_xgb,
+  compare_clot_xgb_lr ,
+  compare_clot_ann_lr ,
+  compare_clot_ann_xgb,
+  compare_clot_ann_bariclot,
+  compare_clot_xgb_bariclot,
+  compare_clot_lr_bariclot )
+
+## make p val table
+compare_table = bind_rows(!!!comparisons)
+```
+
+```{r}
+# sanity check for 2015 bariclot model
+## uncomment to run
+## if running, ensure ./results/bariclot/bariclot_2015.csv file exists
+## if not, build the file at the end of the part4 jupyter notebook 
+#bariclot_2015 = read.csv("results/bariclot/bariclot_2015.csv", header = TRUE)
+#rocobj_clot_bariclot_2015 <- roc(bariclot_2015$targs, bariclot_2015$scores)
+#auc(rocobj_clot_bariclot_2015)
+```
+
+```{r}
+#plotting
+## 0. create subdir to hold figures
+dir.create("results/figures")
+```
+
+```{r}
+## 1. leak
+leak_xgb_sens = rocobj_leak_xgb$sensitivities
+leak_xgb_spec = rocobj_leak_xgb$specificities
+leak_ann_sens = rocobj_leak_ann$sensitivities
+leak_ann_spec = rocobj_leak_ann$specificities
+leak_lr_sens = rocobj_leak_lr$sensitivities
+leak_lr_spec = rocobj_leak_lr$specificities
+
+leak_graph_ann <- bind_cols(list(leak_ann_sens, leak_ann_spec))
+leak_graph_xgb <- bind_cols(list(leak_xgb_sens, leak_xgb_spec))
+leak_graph_lr <- bind_cols(list(leak_lr_sens, leak_lr_spec))
+```
+
+```{r}
+## the data is too dense to plot dashed or dotted lines, 
+## we have to thin it out. otherwise all the lines just look like lines
+## take every 50th value (resoltion is still high enough to look good) 
+leak_graph_ann <- leak_graph_ann[seq(1, nrow(leak_graph_ann), 50), ]
+leak_graph_xgb <- leak_graph_xgb[seq(1, nrow(leak_graph_xgb), 50), ]
+leak_graph_lr <- leak_graph_lr[seq(1, nrow(leak_graph_lr), 50), ]
+```
+
+```{r}
+## change col names
+leak_graph_ann = rename(leak_graph_ann, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+leak_graph_xgb = rename(leak_graph_xgb, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+leak_graph_lr = rename(leak_graph_lr, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+```
+
+```{r}
+# add an indicator variable so we can get the data into long format
+leak_graph_ann = leak_graph_ann %>%
+  mutate(Model = 'ANN')
+leak_graph_xgb = leak_graph_xgb %>%
+  mutate(Model = 'XGB')
+leak_graph_lr = leak_graph_lr %>%
+  mutate(Model = 'LR')
+
+# collect the data in long format
+leak_graph = bind_rows(list(leak_graph_ann, leak_graph_xgb, leak_graph_lr))
+```
+
+```{r}
+ggplot(leak_graph) +
+  geom_line(aes(x=Specificity, y=Sensitivity, linetype=Model), size=.4) + 
+  scale_linetype_manual(breaks=c("ANN", "XGB", "LR"), values=c(1,2,4)) +
+  scale_x_reverse(breaks=c(0,.1, .5, .9, 1)) +
+  theme_bw()
+```
+
+```{r}
+# figures for publication need dpi >=1200 
+# these are too big to share and work with
+# therefore save two versions
+ggsave("results/figures/figure_1_leak_auc.tiff", height=4, width=4, units='in', dpi=1200)
+ggsave("results/figures/figure_1_leak_auc_small.tiff", height=4, width=4, units='in', dpi=120)
+```
+
+```{r}
+## 2. clot
+clot_xgb_sens = rocobj_clot_xgb$sensitivities
+clot_xgb_spec = rocobj_clot_xgb$specificities
+clot_ann_sens = rocobj_clot_ann$sensitivities
+clot_ann_spec = rocobj_clot_ann$specificities
+clot_lr_sens = rocobj_clot_lr$sensitivities
+clot_lr_spec = rocobj_clot_lr$specificities
+clot_bariclot_sens = rocobj_clot_bariclot$sensitivities
+clot_bariclot_spec = rocobj_clot_bariclot$specificities
+
+clot_graph_ann <- bind_cols(list(clot_ann_sens, clot_ann_spec))
+clot_graph_xgb <- bind_cols(list(clot_xgb_sens, clot_xgb_spec))
+clot_graph_lr <- bind_cols(list(clot_lr_sens, clot_lr_spec))
+clot_graph_bariclot <- bind_cols(list(clot_bariclot_sens, clot_bariclot_spec))
+```
+
+```{r}
+## the data is too dense to plot dashed or dotted lines, so we have to thin it out
+## take every nth value (you still get  high resolution) 
+## don't think out bariclot because it's already relatively sparse
+clot_graph_ann <- clot_graph_ann[seq(1, nrow(clot_graph_ann), 36), ]
+clot_graph_xgb <- clot_graph_xgb[seq(1, nrow(clot_graph_xgb), 36), ]
+clot_graph_lr <- clot_graph_lr[seq(1, nrow(clot_graph_lr), 36), ]
+
+## change col names
+clot_graph_ann = rename(clot_graph_ann, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+clot_graph_xgb = rename(clot_graph_xgb, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+clot_graph_lr = rename(clot_graph_lr, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+clot_graph_bariclot = rename(clot_graph_bariclot, 'Sensitivity' = 'V1', 'Specificity' = 'V2')
+
+## add an indicator variable so we can get the data into long format
+clot_graph_ann = clot_graph_ann %>%
+  mutate(Model = 'ANN')
+clot_graph_xgb = clot_graph_xgb %>%
+  mutate(Model = 'XGB')
+clot_graph_lr = clot_graph_lr %>%
+  mutate(Model = 'LR')
+clot_graph_bariclot = clot_graph_bariclot %>%
+  mutate(Model = 'BariClot')
+```
+
+```{r}
+## plots are not starting at the origin, which looks sloppy
+## manually add points on each graph to correct this
+clot_graph_ann = add_row(clot_graph_ann, Sensitivity = 0, Specificity = 1, Model = 'ANN')
+clot_graph_xgb = add_row(clot_graph_xgb, Sensitivity = 0, Specificity = 1, Model = 'XGB')
+clot_graph_lr = add_row(clot_graph_lr, Sensitivity = 0, Specificity = 1, Model = 'LR')
+clot_graph_bariclot = add_row(clot_graph_bariclot, Sensitivity = 0, Specificity = 1, Model = 'BariClot')
+
+## collect the data in long format
+clot_graph = bind_rows(list(clot_graph_xgb, clot_graph_lr, clot_graph_bariclot, clot_graph_ann))
+```
+
+```{r}
+## plot
+ggplot(clot_graph) +
+  geom_line(aes(x=Specificity, y=Sensitivity, linetype=Model), size=.4) + 
+  scale_linetype_manual(breaks=c("ANN", "XGB", "LR", "BariClot"), values=c(1,2,4,3)) +
+  scale_x_reverse(breaks=c(0,.1, .5, .9, 1)) +
+  theme_bw()
+```
+
+```{r}
+## again save two versions:
+ggsave("results/figures/figure_2_clot_auc.tiff", height=4, width=4, units='in', dpi=1200)
+ggsave("results/figures/figure_2_clot_auc_small.tiff", height=4, width=4, units='in', dpi=120)
+```
+
+```{r}
+# variable importance
+## import data
+leak_vimp = read.csv("results/study_models_LEAK/leak_xgb_var_imp.csv", header = TRUE)
+clot_vimp = read.csv("results/study_models_CLOT/clot_xgb_var_imp.csv", header = TRUE)
+
+theme_set(theme_light())
+```
+
+```{r}
+## leak
+ggplot(leak_vimp, aes( x = reorder(names, + relative_imp), y=relative_imp)) + 
+  geom_bar(stat="identity", width=.8, fill="grey38") + 
+  labs(title=" ", 
+       subtitle=" ", 
+       y="Relative Importance",
+       x=" ") +  
+  coord_flip() +
+  theme(axis.text.y = element_text(color = "grey20", size = 8, face = "plain"))
+```
+
+```{r}
+## save 
+ggsave("results/figures/figure_3_xgb_imp_leak.tiff", height=6.5,  units='in', dpi=1200)
+ggsave("results/figures/figure_3_xgb_imp_leak_small.tiff", height=6.5,  units='in', dpi=120)
+```
+
+```{r}
+## clot
+ggplot(clot_vimp, aes( x = reorder(names, +relative_imp), y=relative_imp)) + 
+  geom_bar(stat="identity", width=.8,  fill="grey38") + 
+  labs(title=" ", 
+       subtitle=" ", 
+       caption=" ",
+       y="Relative Importance",
+       x=" ") +  
+  coord_flip() +
+  theme(axis.text.y = element_text(color = "grey20", size = 8, face = "plain"))
+```
+
+```{r}
+## save
+ggsave("results/figures/figure_4_xgb_imp_clot.tiff", height=6.5,  units='in', dpi=1200)
+ggsave("results/figures/figure_4_xgb_imp_clot_small.tiff", height=6.5,  units='in', dpi=120)
+```
+
+```{r}
+# looking just at the partial AUCs on the left side of the leak ROC to see if ANN > XGB > LR as appears to be the case
+## 1. make objects for partial rocs
+rocobj_leak_xgb_partial <- roc(leak_test$targs, leak_test$xgb, partial.auc=c(1, 0.9), partial.auc.focus="sp")
+rocobj_leak_ann_partial <- roc(leak_test$targs, leak_test$ann, partial.auc=c(1, 0.9), partial.auc.focus="sp")
+rocobj_leak_lr_partial  <- roc(leak_test$targs, leak_test$lr, partial.auc=c(1, 0.9), partial.auc.focus="sp")
+```
+
+```{r}
+## 2. comparisons 
+roc.test(rocobj_leak_xgb_partial, rocobj_leak_ann_partial)
+roc.test(rocobj_leak_lr_partial, rocobj_leak_ann_partial)
+roc.test(rocobj_leak_lr_partial, rocobj_leak_xgb_partial)
+```
+
+```{r}
+# compare model performance in training vs validation vs test data
+leak_train = read.csv("results/study_models_LEAK/LEAK_train_FINAL.csv", header = TRUE)
+leak_valid = read.csv("results/study_models_LEAK/LEAK_valid_FINAL.csv", header = TRUE)
+clot_train = read.csv("results/study_models_CLOT/CLOT_train_FINAL.csv", header = TRUE)
+clot_valid = read.csv("results/study_models_CLOT/CLOT_valid_FINAL.csv", header = TRUE)
+```
+
+```{r}
+# revised LR models added after revision:
+lr_leak_valid = read.csv("results/study_models_LEAK/LEAK_logistic_preds_valid", header = TRUE)
+lr_leak_train = read.csv("results/study_models_LEAK/LEAK_logistic_preds_train", header = TRUE)
+lr_clot_valid = read.csv("results/study_models_CLOT/CLOT_logistic_preds_valid", header = TRUE)
+lr_clot_train = read.csv("results/study_models_CLOT/CLOT_logistic_preds_train", header = TRUE)
+```
+
+```{r}
+## get the values for leak
+rocobj_leak_xgb_train <- roc(leak_train$targs, leak_train$xgb)
+rocobj_leak_xgb_valid <- roc(leak_valid$targs, leak_valid$xgb)
+rocobj_leak_ann_train <- roc(leak_train$targs, leak_train$ann)
+rocobj_leak_ann_valid <- roc(leak_valid$targs, leak_valid$ann)
+rocobj_leak_lr_train <- roc(leak_train$targs, lr_leak_train$lr_leak_train)
+rocobj_leak_lr_valid <- roc(leak_valid$targs, lr_leak_valid$lr_leak_valid)
+```
+
+
+```{r}
+## and for clot
+rocobj_clot_xgb_train <- roc(clot_train$targs, clot_train$xgb)
+rocobj_clot_xgb_valid <- roc(clot_valid$targs, clot_valid$xgb)
+rocobj_clot_ann_train <- roc(clot_train$targs, clot_train$ann)
+rocobj_clot_ann_valid <- roc(clot_valid$targs, clot_valid$ann)
+rocobj_clot_lr_train  <- roc(clot_train$targs, lr_clot_train$lr_clot_train)
+rocobj_clot_lr_valid  <- roc(clot_valid$targs, lr_clot_valid$lr_clot_valid)
+```
+
+
+```{r}
+## format data for a table
+leak_xgb_sets = c(Outcome='Leak', Model = 'XGB', Training = rocobj_leak_xgb_train$auc[1], Validation = rocobj_leak_xgb_valid$auc[1],  Testing = rocobj_leak_xgb$auc[1])
+leak_ann_sets = c(Outcome='Leak', Model = 'ANN', Training = rocobj_leak_ann_train$auc[1], Validation = rocobj_leak_ann_valid$auc[1],  Testing = rocobj_leak_ann$auc[1])
+leak_lr_sets  = c(Outcome='Leak', Model = 'LR',  Training =  rocobj_leak_lr_train$auc[1],  Validation = rocobj_leak_lr_valid$auc[1],  Testing = rocobj_leak_lr$auc[1])
+clot_xgb_sets = c(Outcome='VTE',  Model = 'XGB', Training = rocobj_clot_xgb_train$auc[1], Validation = rocobj_clot_xgb_valid$auc[1],  Testing = rocobj_clot_xgb$auc[1])
+clot_ann_sets = c(Outcome='VTE',  Model = 'ANN', Training = rocobj_clot_ann_train$auc[1], Validation = rocobj_clot_ann_valid$auc[1],  Testing = rocobj_clot_ann$auc[1])
+clot_lr_sets  = c(Outcome='VTE',  Model = 'LR',  Training =  rocobj_clot_lr_train$auc[1],  Validation = rocobj_clot_lr_valid$auc[1],  Testing = rocobj_clot_lr$auc[1])
+```
+
+```{r}
+## collect the data
+performances = list(leak_xgb_sets, leak_ann_sets, leak_lr_sets, clot_xgb_sets, clot_ann_sets, clot_lr_sets )
+```
+
+
+```{r}
+## make the table
+performance_by_dataset_table = bind_rows(!!!performances)
+
+performance_by_dataset_table$Training <- as.numeric(as.character(performance_by_dataset_table$Training))
+performance_by_dataset_table$Validation <- as.numeric(as.character(performance_by_dataset_table$Validation))
+performance_by_dataset_table$Testing <- as.numeric(as.character(performance_by_dataset_table$Testing))
+
+performance_by_dataset_table%>% mutate_if(is.numeric, round, 3)
+```
+
+```{r}
+# looking at specific thresholds (as close as possible to 97.5% specificity for both outcomes)
+## 1. get the index of the specificity closest to the specificity of interest
+thresh_leak_ann_975 <- which.min(abs(rocobj_leak_ann$specificities - .975))
+thresh_leak_xgb_975 <- which.min(abs(rocobj_leak_xgb$specificities - .975))
+thresh_leak_lr_975 <- which.min(abs(rocobj_leak_lr$specificities - .975))
+thresh_clot_lr_975 <- which.min(abs(rocobj_clot_lr$specificities - .975))
+thresh_clot_xgb_975 <- which.min(abs(rocobj_clot_xgb$specificities - .975))
+thresh_clot_ann_975 <- which.min(abs(rocobj_clot_ann$specificities - .975))
+thresh_clot_bariclot_975 <- which.min(abs(rocobj_clot_bariclot$specificities - .975))
+```
+
+```{r}
+## 2. get the threshold of that specificity
+thresh_leak_ann_975 <- rocobj_leak_ann$thresholds[thresh_leak_ann_975]
+thresh_leak_xgb_975 <- rocobj_leak_xgb$thresholds[thresh_leak_xgb_975]
+thresh_leak_lr_975  <- rocobj_leak_lr$thresholds[thresh_leak_lr_975]
+thresh_clot_lr_975  <- rocobj_clot_lr$thresholds[thresh_clot_lr_975]
+thresh_clot_xgb_975 <- rocobj_clot_xgb$thresholds[thresh_clot_xgb_975]
+thresh_clot_ann_975 <- rocobj_clot_ann$thresholds[thresh_clot_ann_975]
+thresh_clot_bariclot_975 <- rocobj_clot_bariclot$thresholds[thresh_clot_bariclot_975]
+```
+
+```{r}
+## 3. get the answers
+## note that this is an overnight run! 
+if (overnight_run = TRUE) {
+  thresh_leak_ann_975 <- ci.coords(rocobj_leak_ann , x=thresh_leak_ann_975 , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_leak_xgb_975 <- ci.coords(rocobj_leak_xgb , x=thresh_leak_xgb_975 , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_leak_lr_975  <- ci.coords(rocobj_leak_lr  , x=thresh_leak_lr_975  , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_clot_lr_975  <- ci.coords(rocobj_clot_lr  , x=thresh_clot_lr_975  , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_clot_xgb_975 <- ci.coords(rocobj_clot_xgb , x=thresh_clot_xgb_975 , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_clot_ann_975 <- ci.coords(rocobj_clot_ann , x=thresh_clot_ann_975 , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+  thresh_clot_bariclot_975 <- ci.coords(rocobj_clot_bariclot , x=thresh_clot_bariclot_975 , input = "threshold", ret=c("sensitivity", "specificity", "ppv"), boot.n=10000)
+}
+```
+
+```{r}
+## collect the data
+threshold_measures = list('Sensitivity', 'Specificity', 'PPV')
+```
+
+```{r}
+thresholds_data = list(
+  c(Outcome = 'Leak', Model = 'ANN', Measure = threshold_measures[1], Low = thresh_leak_ann_975[1,1], Median = thresh_leak_ann_975[1,2], High = thresh_leak_ann_975[1,3]),
+  c(Outcome = 'Leak', Model = 'ANN', Measure = threshold_measures[2], Low = thresh_leak_ann_975[2,1], Median = thresh_leak_ann_975[2,2], High = thresh_leak_ann_975[2,3]),
+  c(Outcome = 'Leak', Model = 'ANN', Measure = threshold_measures[3], Low = thresh_leak_ann_975[3,1], Median = thresh_leak_ann_975[3,2], High = thresh_leak_ann_975[3,3]),
+
+  c(Outcome = 'Leak', Model = 'XGB', Measure = threshold_measures[1],  Low = thresh_leak_xgb_975[1,1], Median = thresh_leak_xgb_975[1,2], High = thresh_leak_xgb_975[1,3]),
+  c(Outcome = 'Leak', Model = 'XGB', Measure = threshold_measures[2],  Low = thresh_leak_xgb_975[2,1], Median = thresh_leak_xgb_975[2,2], High = thresh_leak_xgb_975[2,3]),
+  c(Outcome = 'Leak', Model = 'XGB', Measure = threshold_measures[3],  Low = thresh_leak_xgb_975[3,1], Median = thresh_leak_xgb_975[3,2], High = thresh_leak_xgb_975[3,3]),
+      
+  c(Outcome = 'Leak', Model = 'LR', Measure = threshold_measures[1],   Low = thresh_leak_lr_975[1,1], Median = thresh_leak_lr_975[1,2], High = thresh_leak_lr_975[1,3]),
+  c(Outcome = 'Leak', Model = 'LR', Measure = threshold_measures[2],   Low = thresh_leak_lr_975[2,1], Median = thresh_leak_lr_975[2,2], High = thresh_leak_lr_975[2,3]),
+  c(Outcome = 'Leak', Model = 'LR', Measure = threshold_measures[3],   Low = thresh_leak_lr_975[3,1], Median = thresh_leak_lr_975[3,2], High = thresh_leak_lr_975[3,3]),
+        
+  c(Outcome = 'Clot', Model = 'LR', Measure = threshold_measures[1],    Low = thresh_clot_lr_975[1,1], Median = thresh_clot_lr_975[1,2], High = thresh_clot_lr_975[1,3]),
+  c(Outcome = 'Clot', Model = 'LR', Measure = threshold_measures[2],    Low = thresh_clot_lr_975[2,1], Median = thresh_clot_lr_975[2,2], High = thresh_clot_lr_975[2,3]),
+  c(Outcome = 'Clot', Model = 'LR', Measure = threshold_measures[3],    Low = thresh_clot_lr_975[3,1], Median = thresh_clot_lr_975[3,2], High = thresh_clot_lr_975[3,3]),
+       
+  c(Outcome = 'Clot', Model = 'XGB', Measure = threshold_measures[1],   Low = thresh_clot_xgb_975[1,1], Median = thresh_clot_xgb_975[1,2], High = thresh_clot_xgb_975[1,3]),
+  c(Outcome = 'Clot', Model = 'XGB', Measure = threshold_measures[2],   Low = thresh_clot_xgb_975[2,1], Median = thresh_clot_xgb_975[2,2], High = thresh_clot_xgb_975[2,3]),
+  c(Outcome = 'Clot', Model = 'XGB', Measure = threshold_measures[3],   Low = thresh_clot_xgb_975[3,1], Median = thresh_clot_xgb_975[3,2], High = thresh_clot_xgb_975[3,3]),
+      
+  c(Outcome = 'Clot', Model = 'ANN', Measure = threshold_measures[1],    Low = thresh_clot_ann_975[1,1], Median = thresh_clot_ann_975[1,2], High = thresh_clot_ann_975[1,3]),
+  c(Outcome = 'Clot', Model = 'ANN', Measure = threshold_measures[2],    Low = thresh_clot_ann_975[2,1], Median = thresh_clot_ann_975[2,2], High = thresh_clot_ann_975[2,3]),
+  c(Outcome = 'Clot', Model = 'ANN', Measure = threshold_measures[3],    Low = thresh_clot_ann_975[3,1], Median = thresh_clot_ann_975[3,2], High = thresh_clot_ann_975[3,3]),
+  
+  c(Outcome = 'Clot', Model = 'BariClot', Measure = threshold_measures[1], Low = thresh_clot_bariclot_975[1,1], Median = thresh_clot_bariclot_975[1,2], High = thresh_clot_bariclot_975[1,3]),
+  c(Outcome = 'Clot', Model = 'BariClot', Measure = threshold_measures[2], Low = thresh_clot_bariclot_975[2,1], Median = thresh_clot_bariclot_975[2,2], High = thresh_clot_bariclot_975[2,3]),
+  c(Outcome = 'Clot', Model = 'BariClot', Measure = threshold_measures[3], Low = thresh_clot_bariclot_975[3,1], Median = thresh_clot_bariclot_975[3,2], High = thresh_clot_bariclot_975[3,3])
+  )
+```
+
+```{r}
+## make the table
+thresholds_table = bind_rows(!!!thresholds_data)
+thresholds_table = thresholds_table%>% mutate_if(is.numeric, round, 3)
+```
+
+```{r}
+thresholds_table%>% mutate_if(is.numeric, round, 3)
+```
+
