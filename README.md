@@ -1,6 +1,6 @@
 # wls_ai_open
 
-This repository contains code to build and test the models reported in our manuscript _Development and Validation of Machine Learning Models to Predict Gastrointestinal Leak and Venous Thromboembolism After Weight Loss Surgery: An Analysis of the MBSAQIP Database_.
+This repository contains code to build and test the models reported in our manuscript [_Development and Validation of Machine Learning Models to Predict Gastrointestinal Leak and Venous Thromboembolism After Weight Loss Surgery: An Analysis of the MBSAQIP Database_](https://link.springer.com/article/10.1007/s00464-020-07378-x).
 
 Due to the Data Use Agreement associated with use of the Metabolic and Bariatric Surgery Accreditation and Quality Improvement Program Participant Use Files, we cannot post the underlying data here. However, anyone with access to the Metabolic and Bariatric Surgery Accreditation and Quality Improvement Program Participant Use Files can build the models reported in our paper using the code in this repository. 
 
