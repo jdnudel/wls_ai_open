@@ -2,8 +2,6 @@
 
 This repository contains code to build and test the models reported in our manuscript [_Development and Validation of Machine Learning Models to Predict Gastrointestinal Leak and Venous Thromboembolism After Weight Loss Surgery: An Analysis of the MBSAQIP Database_](https://link.springer.com/article/10.1007/s00464-020-07378-x).
 
-If you use this code in your research, please cite our paper: _Nudel J, Bishara AM, de Geus SWL, Patil P, Srinivasan J, Hess DT, Woodson J. Development and validation of machine learning models to predict gastrointestinal leak and venous thromboembolism after weight loss surgery: an analysis of the MBSAQIP database. Surgical Endoscopy. 2020; 10.1007/s00464-020-07378-x_
-
 Due to the Data Use Agreement associated with use of the Metabolic and Bariatric Surgery Accreditation and Quality Improvement Program Participant Use Files, we cannot post the underlying data here. However, anyone with access to the Metabolic and Bariatric Surgery Accreditation and Quality Improvement Program Participant Use Files can build the models reported in our paper using the code in this repository. 
 
 ## 1. configuration and installation
@@ -143,6 +141,10 @@ Important outputs of this script:
 * **partial AUCs on the left side of the ROC curve** with specificity > 90% are generated and outputted on lines 257-256 of this script
 * **`performance_by_dataset_table`**: an R object containing model performance in training, testing, and validation sets for both outcomes of interest (supplementary table 3)
 * **`thresholds_table`**: R object containing performance characteristics of the artificial neural network, gradient boosting machine, and logistic regression models for predicting each outcome (manuscript tables 2 & 3)
+
+## citation
+
+If you use this code in your research, please cite our paper: _Nudel J, Bishara AM, de Geus SWL, Patil P, Srinivasan J, Hess DT, Woodson J. Development and validation of machine learning models to predict gastrointestinal leak and venous thromboembolism after weight loss surgery: an analysis of the MBSAQIP database. Surgical Endoscopy. 2020; 10.1007/s00464-020-07378-x_
 
 ## notes:
 
