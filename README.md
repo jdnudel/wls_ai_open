@@ -144,7 +144,9 @@ Important outputs of this script:
 
 ## citation
 
-If you use this code in your research, please cite our paper: _Nudel J, Bishara AM, de Geus SWL, Patil P, Srinivasan J, Hess DT, Woodson J. Development and validation of machine learning models to predict gastrointestinal leak and venous thromboembolism after weight loss surgery: an analysis of the MBSAQIP database. Surgical Endoscopy. 2020; 10.1007/s00464-020-07378-x_
+If you use this code in your research, please cite our paper: 
+
+* Nudel J, Bishara AM, de Geus SWL, Patil P, Srinivasan J, Hess DT, Woodson J. Development and validation of machine learning models to predict gastrointestinal leak and venous thromboembolism after weight loss surgery: an analysis of the MBSAQIP database. Surgical Endoscopy. 2020; 10.1007/s00464-020-07378-x
 
 ## notes:
 
